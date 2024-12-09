@@ -1,14 +1,40 @@
-<!DOCTYPE html>
+<html>
+  <body>
+    <div id="app"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/jsx">
+       const domNode = document.getElementById("app");
+        const root = ReactDOM.createRoot(domNode);
+        root.render( 
+        <div>
+            <h1 style={{ fontSize: "24px" }}>HELLO, KNAVE. </h1>
+            <p style={{ fontSize: "20px" }}> I HAVE BEEN WAITING FOR YOU FOR FAR, </p>
+            <p style={{ fontSize: "30px" }}> TOO, </p>
+            <p style={{ fontSize: "36px" }}> LONG!!! </p>
+            <p style={{ fontSize: "24px" }}> I HAVE A QUEST FOR YOU.</p>
+       </div>
+        );
+    </script>
+  </body>
+</html>
+
+
+
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>I have a quest for you</title>
-    <!-- <link rel="icon" href="favicon.ico" type="image/x-icon"> --> 
+     <link rel="icon" href="favicon.ico" type="image/x-icon">  
 <h> 
     HELLO, KNAVE.
     I HAVE BEEN WAITING FOR YOU </h>
 
-</head>
+</head> -->
 
-<p> (Quests for you coming soon!)</p>    
+<p> (Quests coming soon!)</p>     
