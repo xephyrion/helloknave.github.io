@@ -2,7 +2,7 @@ name: Audit Log Checker
 
 on:
   schedule:
-    - cron: '0 8 * * *'  # Runs at midnight every day
+    - cron: '0 0 * * *'  # Runs at midnight every day
   workflow_dispatch:     # Allows manual triggering
 
 jobs:
@@ -17,7 +17,10 @@ jobs:
               console.log('Starting audit log check...');
               console.log('Organization:', context.repo.owner);
               
-              const response = await github.rest.auditLog.getAuditLog({
+              // First, let's check what methods are available
+              console.log('Available methods:', Object.keys(github.rest));
+              
+              const response = await github.request('GET /orgs/{org}/audit-log', {
                 org: context.repo.owner,
                 phrase: 'action:protected_branch.update_admin_enforced',
                 include: 'all',
