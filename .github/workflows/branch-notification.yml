@@ -13,56 +13,68 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const response = await github.rest.orgs.getAuditLog({
-              org: context.repo.owner,
-              phrase: 'action:protected_branch.update_admin_enforced',
-              include: 'all',
-              per_page: 100
-            });
-            
-            if (response.data.length > 0) {
-              const events = response.data.map(event => ({
-                repo: event.repo,
-                action: event.action,
-                actor: event.actor,
-                created_at: event.created_at
-              }));
-
-              const notificationText = `Branch Protection Admin Updates Found\n\n${events.map(event => 
-                `Repository: ${event.repo}\nAction: ${event.action}\nUser: ${event.actor}\nTime: ${event.created_at}\n`
-              ).join('\n')}`;
+            try {
+              console.log('Starting audit log check...');
+              console.log('Organization:', context.repo.owner);
               
-              // Send to Slack
-              await fetch(process.env.SLACK_WEBHOOK_URL, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  text: "Branch Protection Admin Update Found",
-                  blocks: [
-                    {
-                      type: "section",
-                      text: {
-                        type: "mrkdwn",
-                        text: `*Branch Protection Admin Updates Found*\n\n${events.map(event => 
-                          `Repository: ${event.repo}\nAction: ${event.action}\nUser: ${event.actor}\nTime: ${event.created_at}\n`
-                        ).join('\n')}`
-                      }
-                    }
-                  ]
-                })
+              const response = await github.rest.auditLog.getAuditLog({
+                org: context.repo.owner,
+                phrase: 'action:protected_branch.update_admin_enforced',
+                include: 'all',
+                per_page: 100
               });
+              
+              console.log('Audit log response:', JSON.stringify(response.data, null, 2));
+              
+              if (response.data.length > 0) {
+                const events = response.data.map(event => ({
+                  repo: event.repo,
+                  action: event.action,
+                  actor: event.actor,
+                  created_at: event.created_at
+                }));
 
-              // Create issue which will trigger email notifications
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: 'Branch Protection Admin Updates Found',
-                body: `@security-team\n\n${notificationText}\n\nCC: security@notablehealth.com`,
-                labels: ['audit-log', 'branch-protection', 'security']
-              });
+                const notificationText = `Branch Protection Admin Updates Found\n\n${events.map(event => 
+                  `Repository: ${event.repo}\nAction: ${event.action}\nUser: ${event.actor}\nTime: ${event.created_at}\n`
+                ).join('\n')}`;
+                
+                // Send to Slack
+                await fetch(process.env.SLACK_WEBHOOK_URL, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    text: "Branch Protection Admin Update Found",
+                    blocks: [
+                      {
+                        type: "section",
+                        text: {
+                          type: "mrkdwn",
+                          text: `*Branch Protection Admin Updates Found*\n\n${events.map(event => 
+                            `Repository: ${event.repo}\nAction: ${event.action}\nUser: ${event.actor}\nTime: ${event.created_at}\n`
+                          ).join('\n')}`
+                        }
+                      }
+                    ]
+                  })
+                });
+
+                // Create issue which will trigger email notifications
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: 'Branch Protection Admin Updates Found',
+                  body: `@security-team\n\n${notificationText}\n\nCC: security@notablehealth.com`,
+                  labels: ['audit-log', 'branch-protection', 'security']
+                });
+              } else {
+                console.log('No branch protection updates found');
+              }
+            } catch (error) {
+              console.error('Error checking audit logs:', error);
+              throw error;
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
