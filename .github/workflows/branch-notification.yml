@@ -1,87 +1,114 @@
-name: Audit Log Checker
+name: Branch Protection Checker
 
 on:
   schedule:
     - cron: '0 0 * * *'  # Runs at midnight every day
   workflow_dispatch:     # Allows manual triggering
 
-# Default to read-only access
+# Explicitly set minimum required permissions
 permissions:
-  contents: read
+  contents: read        # Required to read branch protection settings
+  metadata: read       # Required to read repository metadata
+  security-events: none # No security events access needed
+  actions: none        # No actions access needed
+  checks: none         # No checks access needed
+  deployments: none    # No deployments access needed
+  issues: none         # No issues access needed
+  packages: none       # No packages access needed
+  pages: none          # No pages access needed
+  pull-requests: none  # No PR access needed
+  repository-projects: none # No projects access needed
+  statuses: none       # No status access needed
 
 jobs:
-  check-audit-logs:
+  check-branch-protection:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Audit Logs
+      - name: Check Branch Protection
         uses: actions/github-script@v6
         with:
           script: |
             try {
-              console.log('Starting audit log check...');
-              console.log('Organization:', context.repo.owner);
+              console.log('Starting branch protection check...');
               
-              // First, let's check what methods are available
-              console.log('Available methods:', Object.keys(github.rest));
-              
-              const response = await github.request('GET /orgs/{org}/audit-log', {
-                org: context.repo.owner,
-                phrase: 'action:protected_branch.update_admin_enforced',
-                include: 'all',
-                per_page: 100
+              // Get the current repository's branch protection
+              const response = await github.rest.repos.getBranchProtection({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: 'main'
               });
               
-              console.log('Audit log response:', JSON.stringify(response.data, null, 2));
+              console.log('Branch protection response:', JSON.stringify(response.data, null, 2));
               
-              if (response.data.length > 0) {
-                const events = response.data.map(event => ({
-                  repo: event.repo,
-                  action: event.action,
-                  actor: event.actor,
-                  created_at: event.created_at
-                }));
-
-                const notificationText = `Branch Protection Admin Updates Found\n\n${events.map(event => 
-                  `Repository: ${event.repo}\nAction: ${event.action}\nUser: ${event.actor}\nTime: ${event.created_at}\n`
-                ).join('\n')}`;
+              const protectionDetails = {
+                required_status_checks: response.data.required_status_checks ? 'Enabled' : 'Disabled',
+                enforce_admins: response.data.enforce_admins.enabled ? 'Enabled' : 'Disabled',
+                required_pull_request_reviews: response.data.required_pull_request_reviews ? 'Enabled' : 'Disabled',
+                restrictions: response.data.restrictions ? 'Enabled' : 'Disabled'
+              };
+              
+              const notificationText = `Branch Protection Status Check\n\n` +
+                `Repository: ${context.repo.owner}/${context.repo.repo}\n` +
+                `Branch: main\n` +
+                `Status: Protected\n\n` +
+                `Details:\n` +
+                `• Required Status Checks: ${protectionDetails.required_status_checks}\n` +
+                `• Enforce Admins: ${protectionDetails.enforce_admins}\n` +
+                `• Required PR Reviews: ${protectionDetails.required_pull_request_reviews}\n` +
+                `• Branch Restrictions: ${protectionDetails.restrictions}`;
+              
+              // Send to Slack
+              await fetch(process.env.SLACK_WEBHOOK_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  text: "Branch Protection Status Update",
+                  blocks: [
+                    {
+                      type: "section",
+                      text: {
+                        type: "mrkdwn",
+                        text: notificationText
+                      }
+                    }
+                  ]
+                })
+              });
+              
+            } catch (error) {
+              if (error.status === 404) {
+                console.log('No branch protection rules found');
+                const warningText = `⚠️ Branch Protection Missing!\n\n` +
+                  `Repository: ${context.repo.owner}/${context.repo.repo}\n` +
+                  `Branch: main\n` +
+                  `Status: NOT PROTECTED\n\n` +
+                  `This branch has no protection rules configured.`;
                 
-                // Send to Slack
+                // Send warning to Slack
                 await fetch(process.env.SLACK_WEBHOOK_URL, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
-                    text: "Branch Protection Admin Update Found",
+                    text: "⚠️ Branch Protection Missing",
                     blocks: [
                       {
                         type: "section",
                         text: {
                           type: "mrkdwn",
-                          text: `*Branch Protection Admin Updates Found*\n\n${events.map(event => 
-                            `Repository: ${event.repo}\nAction: ${event.action}\nUser: ${event.actor}\nTime: ${event.created_at}\n`
-                          ).join('\n')}`
+                          text: warningText
                         }
                       }
                     ]
                   })
                 });
-
-                // Create issue which will trigger email notifications
-                await github.rest.issues.create({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  title: 'Branch Protection Admin Updates Found',
-                  body: `@security-team\n\n${notificationText}\n\nCC: security@notablehealth.com`,
-                  labels: ['audit-log', 'branch-protection', 'security']
-                });
               } else {
-                console.log('No branch protection updates found');
+                console.error('Error checking branch protection:', error);
+                throw error;
               }
-            } catch (error) {
-              console.error('Error checking audit logs:', error);
-              throw error;
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 
