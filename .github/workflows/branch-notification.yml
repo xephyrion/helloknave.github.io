@@ -20,8 +20,8 @@ jobs:
               console.log('Starting audit log check...');
               console.log('Organization:', context.repo.owner);
               
-              // Get audit logs for branch protection changes
-              const response = await github.rest.orgs.getAuditLog({
+              // Get audit logs for branch protection changes using the REST API directly
+              const response = await github.request('GET /orgs/{org}/audit-log', {
                 org: context.repo.owner,
                 phrase: 'action:protected_branch.update_admin_enforced',
                 include: 'all',
