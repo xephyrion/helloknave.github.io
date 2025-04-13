@@ -5,6 +5,10 @@ on:
     - cron: '0 0 * * *'  # Runs at midnight every day
   workflow_dispatch:     # Allows manual triggering
 
+# Default to read-only access
+permissions:
+  contents: read
+
 jobs:
   check-audit-logs:
     runs-on: ubuntu-latest
