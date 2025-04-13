@@ -8,8 +8,6 @@ on:
 # Explicitly set minimum required permissions
 permissions:
   contents: read        # Required to read branch protection settings
-  metadata: read       # Required to read repository metadata
-  security-events: none # No security events access needed
   actions: none        # No actions access needed
   checks: none         # No checks access needed
   deployments: none    # No deployments access needed
@@ -18,7 +16,8 @@ permissions:
   pages: none          # No pages access needed
   pull-requests: none  # No PR access needed
   repository-projects: none # No projects access needed
-  statuses: none       # No status access needed
+  security-events: none    # No security events access needed
+  statuses: none          # No status access needed
 
 jobs:
   check-branch-protection:
