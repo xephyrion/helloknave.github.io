@@ -1,108 +1,99 @@
-name: Branch Protection Checker
+name: Audit Log Checker
 
 on:
   schedule:
     - cron: '0 0 * * *'  # Runs at midnight every day
   workflow_dispatch:     # Allows manual triggering
 
-permissions: write-all
+permissions: {}  # No default GITHUB_TOKEN permissions needed since we're using PAT
 
 jobs:
-  check-branch-protection:
+  check-audit-logs:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Branch Protection
+      - name: Check Audit Logs
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}  # PAT with read:audit_log permission
           script: |
             try {
-              console.log('Starting branch protection check...');
-              console.log('Repository:', context.repo.owner + '/' + context.repo.repo);
+              console.log('Starting audit log check...');
+              console.log('Organization:', context.repo.owner);
               
-              // Get the current repository's branch protection
-              const response = await github.rest.repos.getBranchProtection({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                branch: 'main'
+              // Get audit logs for branch protection changes
+              const response = await github.rest.orgs.getAuditLog({
+                org: context.repo.owner,
+                phrase: 'action:protected_branch.update_admin_enforced',
+                include: 'all',
+                per_page: 100
               });
               
-              console.log('Branch protection response:', JSON.stringify(response.data, null, 2));
+              console.log('Found', response.data.length, 'audit log entries');
               
-              const protectionDetails = {
-                required_status_checks: response.data.required_status_checks ? 'Enabled' : 'Disabled',
-                enforce_admins: response.data.enforce_admins.enabled ? 'Enabled' : 'Disabled',
-                required_pull_request_reviews: response.data.required_pull_request_reviews ? 'Enabled' : 'Disabled',
-                restrictions: response.data.restrictions ? 'Enabled' : 'Disabled'
-              };
-              
-              const notificationText = `Branch Protection Status Check\n\n` +
-                `Repository: ${context.repo.owner}/${context.repo.repo}\n` +
-                `Branch: main\n` +
-                `Status: Protected\n\n` +
-                `Details:\n` +
-                `• Required Status Checks: ${protectionDetails.required_status_checks}\n` +
-                `• Enforce Admins: ${protectionDetails.enforce_admins}\n` +
-                `• Required PR Reviews: ${protectionDetails.required_pull_request_reviews}\n` +
-                `• Branch Restrictions: ${protectionDetails.restrictions}`;
-              
-              // Send to Slack
-              await fetch(process.env.SLACK_WEBHOOK_URL, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  text: "Branch Protection Status Update",
-                  blocks: [
-                    {
-                      type: "section",
-                      text: {
-                        type: "mrkdwn",
-                        text: notificationText
-                      }
-                    }
-                  ]
-                })
-              });
-              
-            } catch (error) {
-              if (error.status === 404) {
-                console.log('No branch protection rules found');
-                const warningText = `⚠️ Branch Protection Missing!\n\n` +
-                  `Repository: ${context.repo.owner}/${context.repo.repo}\n` +
-                  `Branch: main\n` +
-                  `Status: NOT PROTECTED\n\n` +
-                  `This branch has no protection rules configured.`;
+              if (response.data.length > 0) {
+                const events = response.data.map(event => ({
+                  repo: event.repo,
+                  action: event.action,
+                  actor: event.actor,
+                  created_at: event.created_at
+                }));
+
+                const notificationText = `Branch Protection Changes Detected\n\n${events.map(event => 
+                  `Repository: ${event.repo}\nAction: ${event.action}\nChanged by: ${event.actor}\nTime: ${event.created_at}\n`
+                ).join('\n')}`;
                 
-                // Send warning to Slack
+                // Send to Slack
                 await fetch(process.env.SLACK_WEBHOOK_URL, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
-                    text: "⚠️ Branch Protection Missing",
+                    text: "Branch Protection Changes Detected",
                     blocks: [
                       {
                         type: "section",
                         text: {
                           type: "mrkdwn",
-                          text: warningText
+                          text: notificationText
                         }
                       }
                     ]
                   })
                 });
               } else {
-                console.error('Error checking branch protection:', error);
-                console.error('Error details:', {
-                  status: error.status,
-                  message: error.message,
-                  documentation_url: error.documentation_url
-                });
-                throw error;
+                console.log('No branch protection changes found in audit logs');
               }
+              
+            } catch (error) {
+              console.error('Error checking audit logs:', error);
+              console.error('Error details:', {
+                status: error.status,
+                message: error.message,
+                documentation_url: error.documentation_url
+              });
+              
+              // Send error to Slack
+              await fetch(process.env.SLACK_WEBHOOK_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  text: "⚠️ Error Checking Audit Logs",
+                  blocks: [
+                    {
+                      type: "section",
+                      text: {
+                        type: "mrkdwn",
+                        text: `Error checking audit logs:\n\`\`\`\n${error.message}\n\`\`\``
+                      }
+                    }
+                  ]
+                })
+              });
+              
+              throw error;
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 
