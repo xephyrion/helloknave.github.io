@@ -1,0 +1,52 @@
+name: Slack Webhook Test
+
+on:
+  workflow_dispatch:     # Allows manual triggering
+
+jobs:
+  test-slack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Slack Webhook
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              console.log('Testing Slack webhook...');
+              
+              const testMessage = `🧪 Test message from GitHub Actions\n` +
+                                `Repository: ${context.repo.owner}/${context.repo.repo}\n` +
+                                `Time: ${new Date().toISOString()}`;
+              
+              // Send test message to Slack
+              const response = await fetch(process.env.SLACK_WEBHOOK_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  text: "Webhook Test",
+                  blocks: [
+                    {
+                      type: "section",
+                      text: {
+                        type: "mrkdwn",
+                        text: testMessage
+                      }
+                    }
+                  ]
+                })
+              });
+              
+              if (!response.ok) {
+                throw new Error(`Slack webhook failed with status ${response.status}`);
+              }
+              
+              console.log('Slack webhook test successful!');
+              
+            } catch (error) {
+              console.error('Error testing Slack webhook:', error);
+              throw error;
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 
