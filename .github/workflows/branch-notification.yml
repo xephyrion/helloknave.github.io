@@ -25,7 +25,11 @@ jobs:
                 org: context.repo.owner,
                 phrase: 'action:protected_branch.update_admin_enforced',
                 include: 'all',
-                per_page: 100
+                per_page: 100,
+                headers: {
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  accept: 'application/vnd.github.v3+json'
+                }
               });
               
               console.log('Found', response.data.length, 'audit log entries');
