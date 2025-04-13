@@ -7,14 +7,15 @@ on:
 
 # Explicitly set minimum required permissions
 permissions:
-  contents: read        # Required to read branch protection settings
-  actions: none        # No actions access needed
-  checks: none         # No checks access needed
-  deployments: none    # No deployments access needed
-  issues: none         # No issues access needed
-  packages: none       # No packages access needed
-  pages: none          # No pages access needed
-  pull-requests: none  # No PR access needed
+  contents: read          # Required for repository access
+  administration: read    # Required for branch protection access
+  actions: none          # No actions access needed
+  checks: none           # No checks access needed
+  deployments: none      # No deployments access needed
+  issues: none           # No issues access needed
+  packages: none         # No packages access needed
+  pages: none            # No pages access needed
+  pull-requests: none    # No PR access needed
   repository-projects: none # No projects access needed
   security-events: none    # No security events access needed
   statuses: none          # No status access needed
